@@ -1,0 +1,36 @@
+name: Оновити дані COT
+
+on:
+  schedule:
+    # CFTC публікує звіт у п'ятницю ~15:30 за східним часом США (19:30-20:30 UTC).
+    - cron: "15 21 * * 5"   # п'ятниця, основний запуск
+    - cron: "0 6 * * 6"     # субота, якщо п'ятничний запуск не встиг
+    - cron: "0 6 * * 1"     # понеділок, якщо вихід звіту перенесли через свята
+  workflow_dispatch:         # ручний запуск кнопкою
+
+permissions:
+  contents: write
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Завантажити дані CFTC і зібрати docs/data.js
+        run: python fetch_cot.py
+        env:
+          CFTC_APP_TOKEN: ${{ secrets.CFTC_APP_TOKEN }}   # необов'язково
+      - name: Зберегти зміни
+        run: |
+          git config user.name "cot-bot"
+          git config user.email "cot-bot@users.noreply.github.com"
+          git add docs/data.js
+          if git diff --cached --quiet; then
+            echo "Нових даних немає"
+          else
+            git commit -m "Оновлено дані COT"
+            git push
+          fi
